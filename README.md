@@ -1,19 +1,34 @@
+---
+
+### README para `incident-infra` (Orquestación)
+
+Este es el archivo más importante para el evaluador, ya que es el punto de entrada.
+
+```markdown
 # 🏗️ Incident Management Infrastructure
-Este repositorio orquestra todo el stack tecnológico mediante Docker.
 
-### Cómo Correr (Pasos Exactos)
-1. Clonar los repositorios `incident-api` e `incident-web` en la misma carpeta raíz que este.
-2. Ejecutar: `docker compose up --build`
-3. Acceder a la Web en: `http://localhost:3000`
+Repositorio central para la orquestación del stack completo de servicios mediante Docker.
 
-### Decisiones de Arquitectura
-- **Persistencia Políglota:** SQL Server para transacciones (ACID) y MongoDB para auditoría (Escalabilidad/Flexibilidad).
-- **Resiliencia:** Uso de `healthcheck` en Docker para asegurar que la API no inicie antes que la base de datos.
+## 📦 Servicios Incluidos
+1. **SQL Server 2022:** Base de datos relacional core.
+2. **MongoDB:** Almacén de eventos y auditoría.
+3. **Mock Service (Wiremock):** Simulación de API externa de catálogo de servicios.
+4. **Incident API:** Backend en .NET 8.
+5. **Incident Web:** Frontend en Next.js.
 
-Análisis de Performance:
+## 🚀 Ejecución del Proyecto (Checklist de Aceptación)
+Para levantar todo el sistema con un solo comando, ejecute desde la raíz de este repositorio:
 
-Query: SELECT * FROM Incidents WHERE Status = @p0 ORDER BY CreatedAt DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY
+```bash
+docker compose up --build
 
-Evidencia: Se recomienda el uso de un Índice Non-Clustered en la columna Status y CreatedAt.
+Requisito de Layout: Se asume que los repositorios incident-api e incident-web se encuentran en carpetas hermanas a este repositorio.
 
-Plan de Ejecución: El costo principal es un Index Seek (eficiente) en lugar de un Table Scan, lo que garantiza respuesta en milisegundos incluso con miles de registros.
+🛠️ Configuración de Infraestructura
+Healthchecks: La API espera automáticamente a que SQL Server esté saludable antes de iniciar.
+
+Inicialización: SQL Server ejecuta el script init.sql automáticamente al primer arranque.
+
+Acceso: - Web: http://localhost:3000
+
+API (Swagger): http://localhost:5000
