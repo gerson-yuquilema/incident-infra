@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # 1. Base de datos SQL Server
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: incident_sql
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=SuperSecretPassw0rd!
+    ports:
+      - "1433:1433"
+    healthcheck:
+      # El healthcheck asegura que la API no intente conectar hasta que SQL esté listo
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'SuperSecretPassw0rd!' -Q 'SELECT 1' -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Base de datos MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: incident_mongo
+    ports:
+      - "27017:27017"
+
+  # 3. Servicio Externo Mock (Wiremock)
+  mock-service:
+    image: wiremock/wiremock:latest
+    container_name: incident_mock
+    ports:
+      - "8080:8080"
+    command: ["--global-response-templating"]
+
+  # 4. Nuestro Backend (.NET API)
+  incident-api:
+    build: 
+      context: ../incident-api
+      dockerfile: Dockerfile
+    container_name: incident_api
+    ports:
+      - "5000:8080"
+    environment:
+      # Conexión a SQL (Usamos el nombre del servicio 'sqlserver')
+      - ConnectionStrings__SqlServer=Server=sqlserver;Database=IncidentDB;User Id=sa;Password=SuperSecretPassw0rd!;TrustServerCertificate=True;
+      
+      # Conexión a MongoDB
+      - ConnectionStrings__MongoDb=mongodb://mongodb:27017
+      
+      # CONFIGURACIÓN DE MONGO (Esto evita el error de 'databaseName' null)
+      - MongoDbSettings__DatabaseName=IncidentDB
+      - MongoDbSettings__EventsCollectionName=IncidentEvents
+      
+      # Configuración del Mock
+      - MockService__BaseUrl=http://mock-service:8080
+      
+      # Modo Desarrollo para ver errores detallados si algo falla
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+
+  # 5. Nuestro Frontend (Next.js)
+  incident-web:
+    build:
+      context: ../incident-web
+      dockerfile: Dockerfile
+    container_name: incident_web
+    ports:
+      - "3000:3000"
+    environment:
+      # El navegador del usuario buscará la API en localhost
+      - NEXT_PUBLIC_API_URL=http://localhost:5000/api
+    depends_on:
+      - incident-api
